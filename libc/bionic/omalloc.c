@@ -25,12 +25,15 @@
 
 /* #define MALLOC_STATS */
 
+#include <sys/cdefs.h>
 #include <sys/types.h>
-#include <sys/param.h>	/* PAGE_SHIFT ALIGN */
+#include <sys/param.h>
 #include <sys/queue.h>
 #include <sys/mman.h>
 #include <sys/uio.h>
 #include <errno.h>
+#include <limits.h>
+#include <pthread.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -42,14 +45,30 @@
 #include <fcntl.h>
 #endif
 
-#include "thread_private.h"
+extern int __isthreaded;
+static pthread_mutex_t _malloc_lock = PTHREAD_MUTEX_INITIALIZER;
+
+#define _MALLOC_LOCK() pthread_mutex_lock(&_malloc_lock)
+#define _MALLOC_UNLOCK() pthread_mutex_unlock(&_malloc_lock)
+
+#ifndef MALLOC_ALIGNMENT
+#define MALLOC_ALIGNMENT ((size_t)(2 * sizeof(void *)))
+#endif
+
+#define ALIGN_MASK (MALLOC_ALIGNMENT - 1)
+#define ALIGN(p) (((uintptr_t)(p) + ALIGN_MASK) & ~ALIGN_MASK)
+#define NBBY 8
+
+#ifndef MADV_FREE
+#define MADV_FREE MADV_DONTNEED
+#endif
 
 #if defined(__sparc__) && !defined(__sparcv9__)
 #define MALLOC_PAGESHIFT	(13U)
 #elif defined(__mips64__)
 #define MALLOC_PAGESHIFT	(14U)
 #else
-#define MALLOC_PAGESHIFT	(PAGE_SHIFT)
+#define MALLOC_PAGESHIFT	(12U)
 #endif
 
 #define MALLOC_MINSHIFT		4
@@ -86,12 +105,6 @@
 
 #define MMAP(sz)	mmap(NULL, (size_t)(sz), PROT_READ | PROT_WRITE, \
     MAP_ANON | MAP_PRIVATE, -1, (off_t) 0)
-
-#define MMAPA(a,sz)	mmap((a), (size_t)(sz), PROT_READ | PROT_WRITE, \
-    MAP_ANON | MAP_PRIVATE, -1, (off_t) 0)
-
-#define MQUERY(a, sz)	mquery((a), (size_t)(sz), PROT_READ | PROT_WRITE, \
-    MAP_ANON | MAP_PRIVATE | MAP_FIXED, -1, (off_t)0)
 
 #define _MALLOC_LEAVE() if (__isthreaded) do { \
 	malloc_active--; \
@@ -146,11 +159,11 @@ struct dir_info {
 #define STATS_ZERO(x)	((x) = 0)
 #define STATS_SETF(x,y)	((x)->f = (y))
 #else
-#define STATS_ADD(x,y)	/* nothing */
-#define STATS_SUB(x,y)	/* nothing */
-#define STATS_INC(x)	/* nothing */
-#define STATS_ZERO(x)	/* nothing */
-#define STATS_SETF(x,y)	/* nothing */
+#define STATS_ADD(x,y)	do {} while (0)
+#define STATS_SUB(x,y)	do {} while (0)
+#define STATS_INC(x)	do {} while (0)
+#define STATS_ZERO(x)	do {} while (0)
+#define STATS_SETF(x,y)	do {} while (0)
 #endif /* MALLOC_STATS */
 	u_int32_t canary2;
 };
@@ -212,7 +225,6 @@ extern char	*__progname;
 
 #ifdef MALLOC_STATS
 void malloc_dump(int);
-PROTO_NORMAL(malloc_dump);
 static void malloc_exit(void);
 #define CALLER	__builtin_return_address(0)
 #else
@@ -224,7 +236,7 @@ static void malloc_exit(void);
  */
 #define REALSIZE(sz, r)						\
 	(sz) = (uintptr_t)(r)->p & MALLOC_PAGEMASK,		\
-	(sz) = ((sz) == 0 ? (r)->size : ((sz) == 1 ? 0 : (1 << ((sz)-1))))
+	(sz) = ((sz) == 0U ? (r)->size : ((sz) == 1U ? 0U : (1U << ((sz)-1U))))
 
 static inline size_t
 hash(void *p)
@@ -491,7 +503,7 @@ omalloc_init(struct dir_info **dp)
 	for (i = 0; i < 3; i++) {
 		switch (i) {
 		case 0:
-			j = readlink("/etc/malloc.conf", b, sizeof b - 1);
+			j = readlink("/system/etc/malloc.conf", b, sizeof b - 1);
 			if (j <= 0)
 				continue;
 			b[j] = '\0';
@@ -649,7 +661,7 @@ omalloc_init(struct dir_info **dp)
 		d->regions_total = 0;
 		return 1;
 	}
-	for (i = 0; i <= MALLOC_MAXSHIFT; i++) {
+	for (i = 0; i <= (int)MALLOC_MAXSHIFT; i++) {
 		LIST_INIT(&d->chunk_info_list[i]);
 		for (j = 0; j < MALLOC_CHUNK_LISTS; j++)
 			LIST_INIT(&d->chunk_dir[i][j]);
@@ -742,7 +754,7 @@ alloc_chunk_info(struct dir_info *d, int bits)
 			return NULL;
 		STATS_ADD(d->malloc_used, MALLOC_PAGESIZE);
 		count = MALLOC_PAGESIZE / size;
-		for (i = 0; i < count; i++, q += size)
+		for (i = 0; i < (int)count; i++, q += size)
 			LIST_INSERT_HEAD(&d->chunk_info_list[bits],
 			    (struct chunk_info *)q, entries);
 	}
@@ -759,7 +771,7 @@ alloc_chunk_info(struct dir_info *d, int bits)
  * non-MAP_FIXED mappings with hint 0 start at BRKSIZ.
  */
 static int
-insert(struct dir_info *d, void *p, size_t sz, void *f)
+insert(struct dir_info *d, void *p, size_t sz, __unused void *f)
 {
 	size_t index;
 	size_t mask;
@@ -893,7 +905,7 @@ omalloc_make_chunks(struct dir_info *d, int bits, int listnum)
 	i = 0;
 
 	/* Do a bunch at a time */
-	for (; (k - i) >= MALLOC_BITS; i += MALLOC_BITS)
+	for (; (k - i) >= (int)MALLOC_BITS; i += MALLOC_BITS)
 		bp->bits[i / MALLOC_BITS] = (u_short)~0U;
 
 	for (; i < k; i++)
@@ -914,7 +926,7 @@ omalloc_make_chunks(struct dir_info *d, int bits, int listnum)
  * Allocate a chunk
  */
 static void *
-malloc_bytes(struct dir_info *d, size_t size, void *f)
+malloc_bytes(struct dir_info *d, size_t size, __unused void *f)
 {
 	int		i, j, listnum;
 	size_t		k;
@@ -1047,7 +1059,7 @@ free_bytes(struct dir_info *d, struct region_info *r, void *ptr)
 	int listnum;
 
 	info = (struct chunk_info *)r->size;
-	if ((chunknum = find_chunknum(d, r, ptr)) == -1)
+	if ((chunknum = find_chunknum(d, r, ptr)) == (uint32_t)-1)
 		return;
 
 	info->bits[chunknum / MALLOC_BITS] |= 1U << (chunknum % MALLOC_BITS);
@@ -1210,7 +1222,6 @@ malloc(size_t size)
 		errno = saved_errno;
 	return r;
 }
-/*DEF_STRONG(malloc);*/
 
 static void
 validate_junk(void *p) {
@@ -1293,7 +1304,7 @@ ofree(void *p)
 		if (mopts.malloc_junk && sz > 0)
 			memset(p, SOME_FREEJUNK, sz - mopts.malloc_canaries);
 		if (!mopts.malloc_freenow) {
-			if (find_chunknum(pool, r, p) == -1)
+			if (find_chunknum(pool, r, p) == (uint32_t)-1)
 				return;
 			i = getrbyte(pool) & MALLOC_DELAYED_CHUNK_MASK;
 			tmp = p;
@@ -1342,8 +1353,6 @@ free(void *ptr)
 	_MALLOC_UNLOCK();
 	errno = saved_errno;
 }
-/*DEF_STRONG(free);*/
-
 
 static void *
 orealloc(void *p, size_t newsz, void *f)
@@ -1393,23 +1402,15 @@ orealloc(void *p, size_t newsz, void *f)
 				if (q == hint)
 					goto gotit;
 				zapcacheregion(pool, hint, needed);
-				q = MQUERY(hint, needed);
-				if (q == hint)
-					q = MMAPA(hint, needed);
-				else
-					q = MAP_FAILED;
-				if (q == hint) {
+				if (mremap(p, roldsz, rnewsz, 0) != MAP_FAILED) {
 gotit:
 					STATS_ADD(pool->malloc_used, needed);
 					if (mopts.malloc_junk == 2)
-						memset(q, SOME_JUNK, needed);
+						memset(hint, SOME_JUNK, needed);
 					r->size = newsz;
 					STATS_SETF(r, f);
 					STATS_INC(pool->cheap_reallocs);
 					return p;
-				} else if (q != MAP_FAILED) {
-					if (munmap(q, needed))
-						wrterror("munmap", q);
 				}
 			}
 		} else if (rnewsz < roldsz) {
@@ -1494,8 +1495,6 @@ realloc(void *ptr, size_t size)
 		errno = saved_errno;
 	return r;
 }
-/*DEF_STRONG(realloc);*/
-
 
 /*
  * This is sqrt(SIZE_MAX+1), as s1*s2 <= SIZE_MAX
@@ -1544,7 +1543,6 @@ calloc(size_t nmemb, size_t size)
 		errno = saved_errno;
 	return r;
 }
-/*DEF_STRONG(calloc);*/
 
 static void *
 mapalign(struct dir_info *d, size_t alignment, size_t sz, int zero_fill)
@@ -1680,7 +1678,6 @@ err:
 	errno = saved_errno;
 	return res;
 }
-/*DEF_STRONG(posix_memalign);*/
 
 #ifdef MALLOC_STATS
 
@@ -1804,7 +1801,7 @@ dump_free_chunk_info(int fd, struct dir_info *d)
 
 	snprintf(buf, sizeof(buf), "Free chunk structs:\n");
 	write(fd, buf, strlen(buf));
-	for (i = 0; i <= MALLOC_MAXSHIFT; i++) {
+	for (i = 0; i <= (int)MALLOC_MAXSHIFT; i++) {
 		count = 0;
 		LIST_FOREACH(p, &d->chunk_info_list[i], entries)
 			count++;
