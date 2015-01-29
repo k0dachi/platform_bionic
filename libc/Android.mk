@@ -605,14 +605,7 @@ ifeq ($(strip $(DEBUG_BIONIC_LIBC)),true)
   libc_common_cflags += -DDEBUG
 endif
 
-ifeq ($(MALLOC_IMPL),dlmalloc)
-  libc_common_cflags += -DUSE_DLMALLOC
-  libc_malloc_src := bionic/dlmalloc.c
-else
-  libc_common_cflags += -DUSE_JEMALLOC
-  libc_malloc_src := bionic/jemalloc_wrapper.cpp
-  libc_common_c_includes += external/jemalloc/include
-endif
+libc_malloc_src := bionic/omalloc.c
 
 # To customize dlmalloc's alignment, set BOARD_MALLOC_ALIGNMENT in
 # the appropriate BoardConfig.mk file.
@@ -1175,10 +1168,6 @@ LOCAL_WHOLE_STATIC_LIBRARIES := \
 LOCAL_WHOLE_STATIC_LIBRARIES_arm := libc_aeabi
 LOCAL_CXX_STL := none
 
-ifneq ($(MALLOC_IMPL),dlmalloc)
-LOCAL_WHOLE_STATIC_LIBRARIES += libjemalloc
-endif
-
 $(eval $(call patch-up-arch-specific-flags,LOCAL_CFLAGS,libc_common_cflags))
 $(eval $(call patch-up-arch-specific-flags,LOCAL_SRC_FILES,libc_common_src_files))
 $(eval $(call patch-up-arch-specific-flags,LOCAL_SRC_FILES,libc_arch_dynamic_src_files))
@@ -1313,10 +1302,6 @@ LOCAL_CLANG := $(use_clang)
 LOCAL_ADDITIONAL_DEPENDENCIES := $(libc_common_additional_dependencies)
 LOCAL_WHOLE_STATIC_LIBRARIES := libc_common
 
-ifneq ($(MALLOC_IMPL),dlmalloc)
-LOCAL_WHOLE_STATIC_LIBRARIES += libjemalloc
-endif
-
 LOCAL_CXX_STL := none
 LOCAL_SYSTEM_SHARED_LIBRARIES :=
 LOCAL_ADDRESS_SANITIZER := false
@@ -1370,10 +1355,6 @@ LOCAL_PACK_MODULE_RELOCATIONS := false
 
 LOCAL_SHARED_LIBRARIES := libdl
 LOCAL_WHOLE_STATIC_LIBRARIES := libc_common
-
-ifneq ($(MALLOC_IMPL),dlmalloc)
-LOCAL_WHOLE_STATIC_LIBRARIES += libjemalloc
-endif
 
 LOCAL_CXX_STL := none
 LOCAL_SYSTEM_SHARED_LIBRARIES :=
