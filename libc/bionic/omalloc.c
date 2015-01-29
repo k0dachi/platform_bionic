@@ -45,6 +45,8 @@
 #include <fcntl.h>
 #endif
 
+#include "omalloc.h"
+
 extern int __isthreaded;
 static pthread_mutex_t _malloc_lock = PTHREAD_MUTEX_INITIALIZER;
 
@@ -1193,7 +1195,7 @@ malloc_init(void)
 }
 
 void *
-malloc(size_t size)
+o_malloc(size_t size)
 {
 	void *r;
 	int saved_errno = errno;
@@ -1329,7 +1331,7 @@ ofree(void *p)
 }
 
 void
-free(void *ptr)
+o_free(void *ptr)
 {
 	int saved_errno = errno;
 
@@ -1466,7 +1468,7 @@ gotit:
 }
 
 void *
-realloc(void *ptr, size_t size)
+o_realloc(void *ptr, size_t size)
 {
 	void *r;
 	int saved_errno = errno;
@@ -1503,7 +1505,7 @@ realloc(void *ptr, size_t size)
 #define MUL_NO_OVERFLOW	(1UL << (sizeof(size_t) * 4))
 
 void *
-calloc(size_t nmemb, size_t size)
+o_calloc(size_t nmemb, size_t size)
 {
 	void *r;
 	int saved_errno = errno;
@@ -1638,7 +1640,7 @@ omemalign(size_t alignment, size_t sz, int zero_fill, void *f)
 }
 
 int
-posix_memalign(void **memptr, size_t alignment, size_t size)
+o_posix_memalign(void **memptr, size_t alignment, size_t size)
 {
 	int res, saved_errno = errno;
 	void *r;
@@ -1677,6 +1679,118 @@ err:
 	res = errno;
 	errno = saved_errno;
 	return res;
+}
+
+#define BIONIC_ROUND_UP_POWER_OF_2(value) \
+	(sizeof(value) == 8) \
+		? (1UL << (64 - __builtin_clzl((unsigned long)(value)))) \
+		: (1UL << (32 - __builtin_clz((unsigned int)(value))))
+
+void *
+o_memalign(size_t boundary, size_t size)
+{
+	void *p;
+	int ret;
+	if (boundary > sizeof(void *)) {
+		if (!powerof2(boundary)) {
+			boundary = BIONIC_ROUND_UP_POWER_OF_2(boundary);
+		}
+	} else
+		boundary = sizeof(void *);
+	ret = o_posix_memalign(&p, boundary, size);
+	if (ret) {
+		errno = ret;
+		return NULL;
+	} else
+		return p;
+}
+
+void *
+o_valloc(size_t size)
+{
+	return o_memalign(PAGE_SIZE, size);
+}
+
+void *
+o_pvalloc(size_t bytes)
+{
+	size_t size = (bytes + PAGE_MASK) & ~PAGE_MASK;
+	if (size < bytes) {
+		errno = ENOMEM;
+		return NULL;
+	}
+	return o_memalign(PAGE_SIZE, size);
+}
+
+static size_t
+omalloc_usable_size(const void *p)
+{
+	struct dir_info *pool = getpool();
+	struct region_info *r;
+	size_t sz;
+
+	r = find(pool, (void *)p);
+	if (r == NULL) {
+		wrterror("bogus pointer in malloc_usable_size", (void *)p);
+		return 0;
+	}
+
+	REALSIZE(sz, r);
+
+	if (sz == 0)
+		return sz;
+
+	if (sz <= MALLOC_MAXCHUNK)
+		return sz - mopts.malloc_canaries;
+
+	return sz - mopts.malloc_guard;
+}
+
+size_t
+o_malloc_usable_size(const void *p)
+{
+	size_t ret;
+
+	if (p == NULL)
+		return 0;
+
+	_MALLOC_LOCK();
+	malloc_func = "malloc_usable_size():";
+	if (getpool() == NULL) {
+		_MALLOC_UNLOCK();
+		wrterror("malloc_usable_size() called before allocation", NULL);
+		return 0;
+	}
+	ret = omalloc_usable_size(p);
+	_MALLOC_UNLOCK();
+	return ret;
+}
+
+struct mallinfo
+o_mallinfo() {
+	struct mallinfo mi;
+	memset(&mi, 0, sizeof(mi));
+	return mi;
+}
+
+size_t __mallinfo_narenas() {
+	return 0;
+}
+
+size_t __mallinfo_nbins() {
+	return 0;
+}
+
+struct mallinfo __mallinfo_arena_info(size_t aidx __unused) {
+	struct mallinfo mi;
+	memset(&mi, 0, sizeof(mi));
+	return mi;
+}
+
+struct mallinfo __mallinfo_bin_info(size_t aidx __unused, size_t bidx __unused) {
+	struct mallinfo mi;
+	memset(&mi, 0, sizeof(mi));
+	return mi;
 }
 
 #ifdef MALLOC_STATS

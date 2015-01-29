@@ -46,15 +46,8 @@
 
 #include "private/ScopedPthreadMutexLocker.h"
 
-#if defined(USE_JEMALLOC)
-#include "jemalloc.h"
-#define Malloc(function)  je_ ## function
-#elif defined(USE_DLMALLOC)
-#include "dlmalloc.h"
-#define Malloc(function)  dl ## function
-#else
-#error "Either one of USE_DLMALLOC or USE_JEMALLOC must be defined."
-#endif
+#include "omalloc.h"
+#define Malloc(function) o_ ## function
 
 // In a VM process, this is set to 1 after fork()ing out of zygote.
 int gMallocLeakZygoteChild = 0;
