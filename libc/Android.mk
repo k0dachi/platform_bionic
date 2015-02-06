@@ -42,6 +42,7 @@ libc_common_src_files := \
     bionic/bindresvport.c \
     bionic/ether_aton.c \
     bionic/ether_ntoa.c \
+    bionic/explicit_memset.c \
     bionic/fts.c \
     bionic/getpriority.c \
     bionic/if_indextoname.c \
