@@ -146,6 +146,7 @@ libc_bionic_ndk_src_files := \
     bionic/gettid.cpp \
     bionic/__gnu_basename.cpp \
     bionic/inotify_init.cpp \
+    bionic/issetugid.cpp \
     bionic/lchown.cpp \
     bionic/lfs64_support.cpp \
     bionic/__libc_current_sigrtmax.cpp \
