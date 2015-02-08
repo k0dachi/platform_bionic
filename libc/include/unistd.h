@@ -188,8 +188,8 @@ int gethostname(char*, size_t);
 int sethostname(const char*, size_t);
 
 extern void *__brk(void *);
-extern int brk(void *);
-extern void *sbrk(ptrdiff_t);
+extern int brk(void *) __warnattr("brk is obsolete; use mmap instead");
+extern void *sbrk(ptrdiff_t) __warnattr("sbrk is obsolete; use mmap instead");
 
 extern int getopt(int, char * const *, const char *);
 extern char *optarg;
