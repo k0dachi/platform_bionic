@@ -69,6 +69,7 @@ LIBC {
     __get_tls; # arm x86 mips
     __getcpu; # arm x86 mips
     __getcwd; # arm x86 mips
+    __getcwd_chk;
     __getdents64; # arm x86 mips
     __getpid; # arm x86 mips
     __getpriority; # arm x86 mips
