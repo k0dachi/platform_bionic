@@ -71,7 +71,7 @@ int strcasecmp_l(const char*, const char*, locale_t) __purefunc;
 int strncasecmp(const char*, const char*, size_t) __purefunc;
 int strncasecmp_l(const char*, const char*, size_t, locale_t) __purefunc;
 
-extern char*  strdup(const char *);
+extern char*  strdup(const char *) __wur;
 
 extern char*  strstr(const char *, const char *) __purefunc;
 extern char*  strcasestr(const char *haystack, const char *needle) __purefunc;
@@ -88,7 +88,7 @@ extern int strerror_r(int, char*, size_t);
 
 extern size_t strnlen(const char *, size_t) __purefunc;
 extern char*  strncat(char* __restrict, const char* __restrict, size_t);
-extern char*  strndup(const char *, size_t);
+extern char*  strndup(const char *, size_t) __wur;
 extern int    strncmp(const char *, const char *, size_t) __purefunc;
 extern char*  stpncpy(char* __restrict, const char* __restrict, size_t);
 extern char*  strncpy(char* __restrict, const char* __restrict, size_t);
