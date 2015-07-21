@@ -169,6 +169,8 @@ LIBC {
     __ptrace; # arm x86 mips
     __putlong;
     __putshort;
+    __pwrite_chk;
+    __pwrite64_chk;
     __read_chk;
     __readlink_chk;
     __readlinkat_chk;
@@ -282,6 +284,7 @@ LIBC {
     __vsprintf_chk;
     __wait4; # arm x86 mips
     __waitid; # arm x86 mips
+    __write_chk;
     _ctype_;
     _Exit;
     _exit;
