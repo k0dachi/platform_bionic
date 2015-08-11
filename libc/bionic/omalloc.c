@@ -30,6 +30,7 @@
 #include <sys/param.h>
 #include <sys/queue.h>
 #include <sys/mman.h>
+#include <sys/system_properties.h>
 #include <sys/uio.h>
 #include <errno.h>
 #include <limits.h>
@@ -603,7 +604,7 @@ omalloc_parseopt(char opt)
 static int
 omalloc_init(struct dir_info **dp)
 {
-	char *p, *q, b[64];
+	char *p, *q, b[64], prop[PROP_VALUE_MAX];
 	int i, j;
 	size_t d_avail, regioninfo_size, guard_low, guard_high;
 	struct dir_info *d;
@@ -615,7 +616,7 @@ omalloc_init(struct dir_info **dp)
 	mopts.malloc_move = 1;
 	mopts.malloc_cache = MALLOC_DEFAULT_CACHE;
 
-	for (i = 0; i < 3; i++) {
+	for (i = 0; i < 4; i++) {
 		switch (i) {
 		case 0:
 			j = readlink("/system/etc/malloc.conf", b, sizeof b - 1);
@@ -625,12 +626,18 @@ omalloc_init(struct dir_info **dp)
 			p = b;
 			break;
 		case 1:
+			if (__system_property_get("persist.libc.malloc.options", prop))
+				p = prop;
+			else
+				continue;
+			break;
+		case 2:
 			if (issetugid() == 0)
 				p = getenv("MALLOC_OPTIONS");
 			else
 				continue;
 			break;
-		case 2:
+		case 3:
 			p = malloc_options;
 			break;
 		default:
