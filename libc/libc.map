@@ -209,6 +209,7 @@ LIBC {
     __sched_getaffinity; # arm x86 mips
     __sclose; # arm x86 mips
     __sdidinit; # arm x86 mips
+    __sendto_chk;
     __set_errno; # arm x86 mips
     __set_thread_area; # x86
     __set_tid_address; # arm x86 mips
