@@ -338,9 +338,16 @@ bool ElfReader::ReserveAddressSpace(const android_dlextinfo* extinfo) {
              reserved_size - load_size_, load_size_, name_);
       return false;
     }
-    int mmap_flags = MAP_PRIVATE | MAP_ANONYMOUS;
-    start = mmap(mmap_hint, load_size_, PROT_NONE, mmap_flags, -1, 0);
-    if (start == MAP_FAILED) {
+    if (mmap_hint) {
+      int mmap_flags = MAP_PRIVATE | MAP_ANONYMOUS;
+      start = mmap(mmap_hint, load_size_, PROT_NONE, mmap_flags, -1, 0);
+      if (start == MAP_FAILED) {
+        start = nullptr;
+      }
+    } else {
+      start = get_library_mapping(load_size_);
+    }
+    if (!start) {
       DL_ERR("couldn't reserve %zd bytes of address space for \"%s\"", load_size_, name_);
       return false;
     }
