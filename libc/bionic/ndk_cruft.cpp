@@ -37,6 +37,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/cdefs.h>
 #include <sys/resource.h>
 #include <sys/syscall.h>
 #include <sys/time.h>
@@ -196,7 +197,7 @@ extern "C" intmax_t strntoimax(const char* nptr, char** endptr, int base, size_t
 }
 
 // POSIX calls this dprintf, but LP32 Android had fdprintf instead.
-extern "C" int fdprintf(int fd, const char* fmt, ...) {
+extern "C" __printflike(2, 3) int fdprintf(int fd, const char* fmt, ...) {
   va_list ap;
   va_start(ap, fmt);
   int rc = vdprintf(fd, fmt, ap);
@@ -205,7 +206,7 @@ extern "C" int fdprintf(int fd, const char* fmt, ...) {
 }
 
 // POSIX calls this vdprintf, but LP32 Android had fdprintf instead.
-extern "C" int vfdprintf(int fd, const char* fmt, va_list ap) {
+extern "C" __printflike(2, 0) int vfdprintf(int fd, const char* fmt, va_list ap) {
   return vdprintf(fd, fmt, ap);
 }
 
