@@ -49,6 +49,7 @@
 
 #include "omalloc.h"
 #include "private/bionic_prctl.h"
+#include "private/libc_logging.h"
 
 extern int __isthreaded;
 static pthread_mutex_t _malloc_lock = PTHREAD_MUTEX_INITIALIZER;
@@ -295,6 +296,7 @@ wrterror(char *msg, void *p)
 	iov[6].iov_base = "\n";
 	iov[6].iov_len = 1;
 	writev(STDERR_FILENO, iov, 7);
+	__libc_fatal_no_abort("%s %s %p", malloc_func, msg, p);
 
 #ifdef MALLOC_STATS
 	if (mopts.malloc_stats)
