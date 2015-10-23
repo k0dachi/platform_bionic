@@ -206,6 +206,7 @@ struct malloc_readonly {
 	int	malloc_freeunmap;	/* mprotect free pages PROT_NONE? */
 	int	malloc_hint;		/* call madvice on free pages?  */
 	int	malloc_junk;		/* junk fill? */
+	int	malloc_validate_full;	/* full junk validation */
 	int	malloc_move;		/* move allocations to end of page? */
 	int	malloc_realloc;		/* always realloc? */
 	int	malloc_xmalloc;		/* xmalloc behaviour? */
@@ -242,6 +243,8 @@ static void malloc_exit(void);
 #else
 #define CALLER	NULL
 #endif
+
+static void validate_delayed_chunks(void);
 
 /* low bits of r->p determine size: 0 means >= page size and p->size holding
  *  real size, otherwise r->size is a shift count, or 1 for malloc(0)
@@ -595,6 +598,12 @@ omalloc_init(struct dir_info **dp)
 			case 'J':
 				mopts.malloc_junk = 2;
 				break;
+			case 'v':
+				mopts.malloc_validate_full = 0;
+				break;
+			case 'V':
+				mopts.malloc_validate_full = 1;
+				break;
 			case 'n':
 			case 'N':
 				break;
@@ -653,6 +662,12 @@ omalloc_init(struct dir_info **dp)
 		write(STDERR_FILENO, q, sizeof(q) - 1);
 	}
 #endif /* MALLOC_STATS */
+
+	if (mopts.malloc_junk && (atexit(validate_delayed_chunks) == -1)) {
+		static const char q[] = "malloc() warning: atexit(2) failed."
+		    " Will not be able to check for use after free\n";
+		write(STDERR_FILENO, q, sizeof(q) - 1);
+	}
 
 	while ((mopts.malloc_canary = arc4random()) == 0)
 		;
@@ -1283,7 +1298,7 @@ validate_junk(void *p) {
 	REALSIZE(sz, r);
 	if (sz > 0 && sz <= MALLOC_MAXCHUNK)
 		sz -= mopts.malloc_canaries;
-	if (sz > 32)
+	if (!mopts.malloc_validate_full && sz > 32)
 		sz = 32;
 	for (byte = 0; byte < sz; byte++) {
 		if (((unsigned char *)p)[byte] != SOME_FREEJUNK) {
@@ -1291,6 +1306,22 @@ validate_junk(void *p) {
 			return;
 		}
 	}
+}
+
+static void
+validate_delayed_chunks(void) {
+	struct dir_info *pool;
+	int i;
+	_MALLOC_LOCK();
+	malloc_func = "validate_delayed_chunks():";
+        pool = getpool();
+	if (pool == NULL) {
+		_MALLOC_UNLOCK();
+		return;
+	}
+	for (i = 0; i < MALLOC_DELAYED_CHUNK_MASK + 1; i++)
+		validate_junk(pool->delayed_chunks[i]);
+	_MALLOC_UNLOCK();
 }
 
 static void
