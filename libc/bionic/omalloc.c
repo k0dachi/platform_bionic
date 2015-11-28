@@ -670,6 +670,18 @@ __malloc_post_fork_child(void)
 	pthread_mutex_init(&_malloc_lock, NULL);
 }
 
+static void
+handle_qualcomm_camera_service(void) {
+#if defined(ANGLER) || defined(BULLHEAD)
+	const char expected[] = "/vendor/bin/mm-qcamera-daemon";
+	char path[sizeof(expected)];
+	if (readlink("/proc/self/exe", path, sizeof(path)) == -1)
+		return;
+	if (strcmp(expected, path) == 0)
+		mopts.malloc_freeunmap = 0;
+#endif
+}
+
 /*
  * Initialize a dir_info, which should have been cleared by caller
  */
@@ -738,6 +750,8 @@ omalloc_init(struct dir_info **dp)
 
 	if (mopts.malloc_move == 1 && !mopts.malloc_guard)
 		mopts.malloc_move = 0;
+
+	handle_qualcomm_camera_service();
 
 #ifdef MALLOC_STATS
 	if (mopts.malloc_stats && (atexit(malloc_exit) == -1)) {
