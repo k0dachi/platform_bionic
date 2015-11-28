@@ -592,6 +592,14 @@ libc_common_cflags := \
     -Wall -Wextra -Wunused \
     -fno-stack-protector -fstack-protector
 
+ifeq ($(TARGET_DEVICE),angler)
+  libc_common_cflags += -DANGLER
+endif
+
+ifeq ($(TARGET_DEVICE),bullhead)
+  libc_common_cflags += -DBULLHEAD
+endif
+
 ifneq ($(TARGET_USES_LOGD),false)
 libc_common_cflags += -DTARGET_USES_LOGD
 endif
