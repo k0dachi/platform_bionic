@@ -526,6 +526,18 @@ __malloc_post_fork_child(void)
 	pthread_mutex_init(&_malloc_lock, NULL);
 }
 
+static void
+handle_bullhead_mediaserver(void) {
+#ifdef BULLHEAD
+	const char expected[] = "/system/bin/mediaserver";
+	char path[sizeof(expected)];
+	if (readlink("/proc/self/exe", path, sizeof(path)) == -1)
+		return;
+	if (strcmp(expected, path) == 0)
+		mopts.malloc_junk = 0;
+#endif
+}
+
 /*
  * Initialize a dir_info, which should have been cleared by caller
  */
@@ -691,6 +703,8 @@ omalloc_init(struct dir_info **dp)
 
 	if (mopts.malloc_move == 1 && !mopts.malloc_guard)
 		mopts.malloc_move = 0;
+
+	handle_bullhead_mediaserver();
 
 #ifdef MALLOC_STATS
 	if (mopts.malloc_stats && (atexit(malloc_exit) == -1)) {
