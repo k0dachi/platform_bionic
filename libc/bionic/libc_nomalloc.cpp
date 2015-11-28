@@ -31,3 +31,7 @@
 extern "C" size_t __malloc_object_size(const void *) {
   return (size_t)-1;
 }
+
+extern "C" void __malloc_pre_fork() {}
+extern "C" void __malloc_post_fork_parent() {}
+extern "C" void __malloc_post_fork_child() {}

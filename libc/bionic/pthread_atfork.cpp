@@ -119,6 +119,10 @@ class atfork_list_t {
 static pthread_mutex_t g_atfork_list_mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
 static atfork_list_t g_atfork_list;
 
+extern "C" void __malloc_pre_fork();
+extern "C" void __malloc_post_fork_parent();
+extern "C" void __malloc_post_fork_child();
+
 void __bionic_atfork_run_prepare() {
   // We lock the atfork list here, unlock it in the parent, and reset it in the child.
   // This ensures that nobody can modify the handler array between the calls
@@ -133,6 +137,8 @@ void __bionic_atfork_run_prepare() {
       it->prepare();
     }
   });
+
+  __malloc_pre_fork();
 }
 
 void __bionic_atfork_run_child() {
@@ -141,6 +147,8 @@ void __bionic_atfork_run_child() {
       it->child();
     }
   });
+
+  __malloc_post_fork_child();
 
   g_atfork_list_mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
 }
@@ -151,6 +159,8 @@ void __bionic_atfork_run_parent() {
       it->parent();
     }
   });
+
+  __malloc_post_fork_parent();
 
   pthread_mutex_unlock(&g_atfork_list_mutex);
 }
