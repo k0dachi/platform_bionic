@@ -508,20 +508,20 @@ map(struct dir_info *d, void *hint, size_t sz, int zero_fill)
 	return p;
 }
 
-static void
-pre_fork(void)
+void
+__malloc_pre_fork(void)
 {
 	pthread_mutex_lock(&_malloc_lock);
 }
 
-static void
-post_fork_parent(void)
+void
+__malloc_post_fork_parent(void)
 {
 	pthread_mutex_unlock(&_malloc_lock);
 }
 
-static void
-post_fork_child(void)
+void
+__malloc_post_fork_child(void)
 {
 	pthread_mutex_init(&_malloc_lock, NULL);
 }
@@ -536,8 +536,6 @@ omalloc_init(struct dir_info **dp)
 	int i, j;
 	size_t d_avail, regioninfo_size, guard_low, guard_high;
 	struct dir_info *d;
-
-	pthread_atfork(&pre_fork, &post_fork_parent, &post_fork_child);
 
 	/*
 	 * Default options
