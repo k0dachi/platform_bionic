@@ -367,23 +367,9 @@ extern "C" void endpwent() { }
 
 // Since dlmalloc_inspect_all and dlmalloc_trim are exported for systems
 // that use dlmalloc, be consistent and export them everywhere.
-#if defined(USE_JEMALLOC)
 extern "C" void dlmalloc_inspect_all(void (*)(void*, void*, size_t, void*), void*) {
 }
-#else
-extern "C" void dlmalloc_inspect_all_real(void (*)(void*, void*, size_t, void*), void*);
-extern "C" void dlmalloc_inspect_all(void (*handler)(void*, void*, size_t, void*), void* arg) {
-  dlmalloc_inspect_all_real(handler, arg);
-}
-#endif
 
-#if defined(USE_JEMALLOC)
 extern "C" int dlmalloc_trim(size_t) {
   return 0;
 }
-#else
-extern "C" int dlmalloc_trim_real(size_t);
-extern "C" int dlmalloc_trim(size_t pad) {
-  return dlmalloc_trim_real(pad);
-}
-#endif
