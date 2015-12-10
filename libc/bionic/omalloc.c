@@ -1881,6 +1881,44 @@ o_malloc_usable_size(const void *p)
 	return ret;
 }
 
+static size_t
+omalloc_object_size(const void *p)
+{
+	struct dir_info *pool = getpool();
+	struct region_info *r;
+	size_t sz;
+
+	r = find(pool, (void *)p);
+	if (r == NULL)
+		return (size_t)-1;
+
+	REALSIZE(sz, r);
+
+	if (sz == 0)
+		return sz;
+
+	if (sz <= MALLOC_MAXCHUNK)
+		return sz - mopts.malloc_canaries;
+
+	return sz - mopts.malloc_guard;
+}
+
+size_t
+o___malloc_object_size(const void *p)
+{
+	size_t ret;
+
+	_MALLOC_LOCK();
+	malloc_func = "__malloc_object_size():";
+	if (getpool() == NULL) {
+		_MALLOC_UNLOCK();
+		return (size_t)-1;
+	}
+	ret = omalloc_object_size(p);
+	_MALLOC_UNLOCK();
+	return ret;
+}
+
 struct mallinfo
 o_mallinfo() {
 	struct mallinfo mi;
