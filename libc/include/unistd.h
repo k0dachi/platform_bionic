@@ -254,6 +254,12 @@ __errordecl(__readlinkat_dest_size_error, "readlinkat called with size bigger th
 __errordecl(__readlinkat_size_toobig_error, "readlinkat called with size > SSIZE_MAX");
 extern ssize_t __readlinkat_real(int dirfd, const char*, char*, size_t) __RENAME(readlinkat);
 
+#ifdef _FORTIFY_SOURCE_STATIC
+#define __dynamic_object_size(ptr) (size_t)-1
+#else
+extern size_t __dynamic_object_size(const void*);
+#endif
+
 #if defined(__BIONIC_FORTIFY)
 
 __BIONIC_FORTIFY_INLINE
@@ -270,7 +276,7 @@ char* getcwd(char* buf, size_t size) {
     if (buf == NULL) {
         bos = __BIONIC_FORTIFY_UNKNOWN_SIZE;
     }
-#else
+#elif defined(_FORTIFY_SOURCE_STATIC)
     if (bos == __BIONIC_FORTIFY_UNKNOWN_SIZE) {
         return __getcwd_real(buf, size);
     }
@@ -282,6 +288,11 @@ char* getcwd(char* buf, size_t size) {
     if (__builtin_constant_p(size) && (size <= bos)) {
         return __getcwd_real(buf, size);
     }
+#endif
+
+#ifndef _FORTIFY_SOURCE_STATIC
+    size_t dynamic_bos = __dynamic_object_size(buf);
+    bos = dynamic_bos < bos ? dynamic_bos : bos;
 #endif
 
     return __getcwd_chk(buf, size, bos);
@@ -297,7 +308,7 @@ __BIONIC_FORTIFY_INLINE
 ssize_t pread(int fd, void* buf, size_t count, off_t offset) {
     size_t bos = __bos0(buf);
 
-#if !defined(__clang__)
+#if !defined(__clang__) && defined(_FORTIFY_SOURCE_STATIC)
     if (__builtin_constant_p(count) && (count > SSIZE_MAX)) {
         __PREAD_PREFIX(count_toobig_error)();
     }
@@ -315,6 +326,11 @@ ssize_t pread(int fd, void* buf, size_t count, off_t offset) {
     }
 #endif
 
+#ifndef _FORTIFY_SOURCE_STATIC
+    size_t dynamic_bos = __dynamic_object_size(buf);
+    bos = dynamic_bos < bos ? dynamic_bos : bos;
+#endif
+
     return __PREAD_PREFIX(chk)(fd, buf, count, offset, bos);
 }
 
@@ -322,7 +338,7 @@ __BIONIC_FORTIFY_INLINE
 ssize_t pread64(int fd, void* buf, size_t count, off64_t offset) {
     size_t bos = __bos0(buf);
 
-#if !defined(__clang__)
+#if !defined(__clang__) && defined(_FORTIFY_SOURCE_STATIC)
     if (__builtin_constant_p(count) && (count > SSIZE_MAX)) {
         __pread64_count_toobig_error();
     }
@@ -340,6 +356,11 @@ ssize_t pread64(int fd, void* buf, size_t count, off64_t offset) {
     }
 #endif
 
+#ifndef _FORTIFY_SOURCE_STATIC
+    size_t dynamic_bos = __dynamic_object_size(buf);
+    bos = dynamic_bos < bos ? dynamic_bos : bos;
+#endif
+
     return __pread64_chk(fd, buf, count, offset, bos);
 }
 
@@ -347,7 +368,7 @@ __BIONIC_FORTIFY_INLINE
 ssize_t read(int fd, void* buf, size_t count) {
     size_t bos = __bos0(buf);
 
-#if !defined(__clang__)
+#if !defined(__clang__) && defined(_FORTIFY_SOURCE_STATIC)
     if (__builtin_constant_p(count) && (count > SSIZE_MAX)) {
         __read_count_toobig_error();
     }
@@ -365,6 +386,11 @@ ssize_t read(int fd, void* buf, size_t count) {
     }
 #endif
 
+#ifndef _FORTIFY_SOURCE_STATIC
+    size_t dynamic_bos = __dynamic_object_size(buf);
+    bos = dynamic_bos < bos ? dynamic_bos : bos;
+#endif
+
     return __read_chk(fd, buf, count, bos);
 }
 
@@ -372,7 +398,7 @@ __BIONIC_FORTIFY_INLINE
 ssize_t readlink(const char* path, char* buf, size_t size) {
     size_t bos = __bos(buf);
 
-#if !defined(__clang__)
+#if !defined(__clang__) && defined(_FORTIFY_SOURCE_STATIC)
     if (__builtin_constant_p(size) && (size > SSIZE_MAX)) {
         __readlink_size_toobig_error();
     }
@@ -390,6 +416,11 @@ ssize_t readlink(const char* path, char* buf, size_t size) {
     }
 #endif
 
+#ifndef _FORTIFY_SOURCE_STATIC
+    size_t dynamic_bos = __dynamic_object_size(buf);
+    bos = dynamic_bos < bos ? dynamic_bos : bos;
+#endif
+
     return __readlink_chk(path, buf, size, bos);
 }
 
@@ -397,7 +428,7 @@ __BIONIC_FORTIFY_INLINE
 ssize_t readlinkat(int dirfd, const char* path, char* buf, size_t size) {
     size_t bos = __bos(buf);
 
-#if !defined(__clang__)
+#if !defined(__clang__) && defined(_FORTIFY_SOURCE_STATIC)
     if (__builtin_constant_p(size) && (size > SSIZE_MAX)) {
         __readlinkat_size_toobig_error();
     }
@@ -415,10 +446,19 @@ ssize_t readlinkat(int dirfd, const char* path, char* buf, size_t size) {
     }
 #endif
 
+#ifndef _FORTIFY_SOURCE_STATIC
+    size_t dynamic_bos = __dynamic_object_size(buf);
+    bos = dynamic_bos < bos ? dynamic_bos : bos;
+#endif
+
     return __readlinkat_chk(dirfd, path, buf, size, bos);
 }
 
 #endif /* defined(__BIONIC_FORTIFY) */
+
+#ifdef _FORTIFY_SOURCE_STATIC
+#undef __dynamic_object_size
+#endif
 
 __END_DECLS
 
