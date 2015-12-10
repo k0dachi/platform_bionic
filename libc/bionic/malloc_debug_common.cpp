@@ -64,6 +64,7 @@ static const MallocDebug __libc_malloc_default_dispatch __attribute__((aligned(3
   Malloc(mallinfo),
   Malloc(malloc),
   Malloc(malloc_usable_size),
+  Malloc(__malloc_object_size),
   Malloc(memalign),
   Malloc(posix_memalign),
 #if defined(HAVE_DEPRECATED_MALLOC_FUNCS)
@@ -265,6 +266,10 @@ extern "C" void* malloc(size_t bytes) {
 
 extern "C" size_t malloc_usable_size(const void* mem) {
   return malloc_dispatch.table->malloc_usable_size(mem);
+}
+
+extern "C" size_t __malloc_object_size(const void* mem) {
+  return malloc_dispatch.table->__malloc_object_size(mem);
 }
 
 extern "C" void* memalign(size_t alignment, size_t bytes) {

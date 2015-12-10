@@ -299,13 +299,19 @@ __errordecl(__sendto_error, "sendto called with size bigger than buffer");
 extern ssize_t __sendto_chk(int, const void*, size_t, size_t, int, const struct sockaddr*, socklen_t);
 extern ssize_t __sendto_real(int, const void*, size_t, int, const struct sockaddr*, socklen_t) __RENAME(sendto);
 
+#ifdef _FORTIFY_SOURCE_STATIC
+#define __dynamic_object_size(ptr) (size_t)-1
+#else
+extern size_t __dynamic_object_size(const void*);
+#endif
+
 #if defined(__BIONIC_FORTIFY)
 
 __BIONIC_FORTIFY_INLINE
 ssize_t recvfrom(int fd, void* buf, size_t len, int flags, const struct sockaddr* src_addr, socklen_t* addr_len) {
   size_t bos = __bos0(buf);
 
-#if !defined(__clang__)
+#if !defined(__clang__) && defined(_FORTIFY_SOURCE_STATIC)
   if (bos == __BIONIC_FORTIFY_UNKNOWN_SIZE) {
     return __recvfrom_real(fd, buf, len, flags, src_addr, addr_len);
   }
@@ -317,6 +323,11 @@ ssize_t recvfrom(int fd, void* buf, size_t len, int flags, const struct sockaddr
   if (__builtin_constant_p(len) && (len > bos)) {
     __recvfrom_error();
   }
+#endif
+
+#ifndef _FORTIFY_SOURCE_STATIC
+  size_t dynamic_bos = __dynamic_object_size(buf);
+  bos = dynamic_bos < bos ? dynamic_bos : bos;
 #endif
 
   return __recvfrom_chk(fd, buf, len, bos, flags, src_addr, addr_len);
@@ -331,7 +342,7 @@ __BIONIC_FORTIFY_INLINE
 ssize_t sendto(int fd, const void* buf, size_t len, int flags, const struct sockaddr* dest_addr, socklen_t addr_len) {
   size_t bos = __bos0(buf);
 
-#if !defined(__clang__)
+#if !defined(__clang__) && defined(_FORTIFY_SOURCE_STATIC)
   if (bos == __BIONIC_FORTIFY_UNKNOWN_SIZE) {
     return __sendto_real(fd, buf, len, flags, dest_addr, addr_len);
   }
@@ -345,6 +356,11 @@ ssize_t sendto(int fd, const void* buf, size_t len, int flags, const struct sock
   }
 #endif
 
+#ifndef _FORTIFY_SOURCE_STATIC
+  size_t dynamic_bos = __dynamic_object_size(buf);
+  bos = dynamic_bos < bos ? dynamic_bos : bos;
+#endif
+
   return __sendto_chk(fd, buf, len, bos, flags, dest_addr, addr_len);
 }
 
@@ -356,6 +372,10 @@ ssize_t send(int socket, const void* buf, size_t len, int flags) {
 #endif /* __BIONIC_FORTIFY */
 
 #undef __socketcall
+
+#ifdef _FORTIFY_SOURCE_STATIC
+#undef __dynamic_object_size
+#endif
 
 __END_DECLS
 
