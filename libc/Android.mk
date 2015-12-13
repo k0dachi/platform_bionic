@@ -587,6 +587,7 @@ libc_common_cflags := \
     -D_LIBC=1 \
     -D_FORTIFY_SOURCE_STATIC \
     -Wall -Wextra -Wunused \
+    -fno-stack-protector -fstack-protector
 
 ifneq ($(TARGET_USES_LOGD),false)
 libc_common_cflags += -DTARGET_USES_LOGD
