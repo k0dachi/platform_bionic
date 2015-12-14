@@ -37,6 +37,13 @@
 extern "C" size_t __malloc_object_size(const void*);
 int __pthread_attr_getstack_main_thread(void** stack_base, size_t* stack_size);
 
+#ifndef __LP64__
+extern "C" char __executable_start;
+extern "C" char etext;
+extern "C" char edata;
+extern "C" char end;
+#endif
+
 static void* main_thread_stack_top = nullptr;
 
 static void main_thread_stack_top_init() {
@@ -75,6 +82,18 @@ extern "C" size_t __dynamic_object_size(const void* ptr) {
     }
     return static_cast<char*>(stack_top) - static_cast<char*>(const_cast<void*>(ptr));
   }
+
+#ifndef __LP64__
+  if (ptr > &__executable_start && ptr < &end) {
+    if (ptr < &etext) {
+      return &etext - static_cast<char*>(const_cast<void*>(ptr));
+    }
+    if (ptr < &edata) {
+      return &edata - static_cast<char*>(const_cast<void*>(ptr));
+    }
+    return &end - static_cast<char*>(const_cast<void*>(ptr));
+  }
+#endif
 
   return __malloc_object_size(ptr);
 }
