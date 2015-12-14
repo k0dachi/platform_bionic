@@ -98,6 +98,8 @@ LIBC {
     __libc_current_sigrtmax;
     __libc_current_sigrtmin;
     __libc_init;
+    __library_region_end;
+    __library_region_start;
     __llseek; # arm x86 mips
     __loc_aton;
     __loc_ntoa;
