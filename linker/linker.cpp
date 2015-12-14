@@ -238,8 +238,8 @@ struct region_span {
 static region_span region_spans;
 static LinkerTypeAllocator<region_span> region_span_allocator;
 
-static const void* library_region_start;
-static const void* library_region_end;
+extern const void* __library_region_start;
+extern const void* __library_region_end;
 
 static void remove_span(region_span* span) {
   span->prev->next = span->next;
@@ -273,8 +273,8 @@ static void library_region_init() {
 
   region_spans.next = span;
 
-  library_region_start = span->ptr;
-  library_region_end = span->ptr + size;
+  __library_region_start = span->ptr;
+  __library_region_end = span->ptr + size;
 }
 
 void* get_library_mapping(size_t size) {
@@ -312,7 +312,7 @@ void* get_library_mapping(size_t size) {
 }
 
 static void release_library_mapping(void* ptr, size_t size) {
-  if (ptr >= library_region_start && ptr < library_region_end) {
+  if (ptr >= __library_region_start && ptr < __library_region_end) {
     mmap(ptr, size, PROT_NONE, MAP_FIXED | MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     prctl(PR_SET_VMA, PR_SET_VMA_ANON_NAME, ptr, size, "library region");
 

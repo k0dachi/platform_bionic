@@ -44,6 +44,9 @@ extern "C" char edata;
 extern "C" char end;
 #endif
 
+extern const void* __library_region_start;
+extern const void* __library_region_end;
+
 static void* main_thread_stack_top = nullptr;
 
 static void main_thread_stack_top_init() {
@@ -94,6 +97,11 @@ extern "C" size_t __dynamic_object_size(const void* ptr) {
     return &end - static_cast<char*>(const_cast<void*>(ptr));
   }
 #endif
+
+  if (ptr > __library_region_start && ptr < __library_region_end) {
+    return static_cast<char*>(const_cast<void*>(__library_region_end)) -
+      static_cast<char*>(const_cast<void*>(ptr));
+  }
 
   return __malloc_object_size(ptr);
 }
