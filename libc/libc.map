@@ -106,6 +106,7 @@ LIBC {
     __lshrdi3; # arm
     __ltdf2; # arm
     __memchr_chk;
+    __memcmp_chk;
     __memcpy_chk;
     __memmove_chk;
     __memrchr_chk;
