@@ -37,7 +37,7 @@
 #include "private/libc_logging.h"
 
 extern "C" __LIBC_HIDDEN__ int getentropy(void*, size_t);
-static long __bionic_setjmp_cookie;
+long __bionic_setjmp_cookie;
 
 extern "C" void __bionic_setjmp_cookie_init() {
   char* random_data = reinterpret_cast<char*>(getauxval(AT_RANDOM));
