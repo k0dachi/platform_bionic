@@ -16,18 +16,19 @@
 #include <sys/cdefs.h>
 
 struct thread_local_dtor {
-  void (*func) (void *);
+  uintptr_t func;
   void *arg;
   void *dso_handle; // unused...
   thread_local_dtor* next;
 };
 
+extern uintptr_t __bionic_setjmp_cookie;
 static __thread thread_local_dtor* thread_local_dtors = nullptr;
 
 extern "C" int __cxa_thread_atexit_impl(void (*func) (void *), void *arg, void *dso_handle) {
   thread_local_dtor* dtor = new thread_local_dtor();
 
-  dtor->func = func;
+  dtor->func = __bionic_setjmp_cookie ^ (uintptr_t)func;
   dtor->arg = arg;
   dtor->dso_handle = dso_handle;
   dtor->next = thread_local_dtors;
@@ -42,7 +43,7 @@ extern "C" __LIBC_HIDDEN__ void __cxa_thread_finalize() {
     thread_local_dtor* current = thread_local_dtors;
     thread_local_dtors = current->next;
 
-    current->func(current->arg);
+    ((void (*)(void *))(__bionic_setjmp_cookie ^ current->func))(current->arg);
     delete current;
   }
 }
