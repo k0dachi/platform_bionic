@@ -159,7 +159,9 @@ struct dir_info {
 					/* free pages cache */
 	struct region_info free_regions[MALLOC_MAXCACHE];
 					/* delayed free chunk slots */
+	size_t queue_index;
 	void *delayed_chunks[MALLOC_DELAYED_CHUNK_MASK + 1];
+	void *delayed_chunks_queue[MALLOC_DELAYED_CHUNK_MASK + 1];
 	size_t rbytesused;		/* random bytes used */
 	u_char rbytes[32];		/* random bytes */
 	u_short chunk_start;
@@ -1369,8 +1371,10 @@ validate_delayed_chunks(void) {
 		_MALLOC_UNLOCK();
 		return;
 	}
-	for (i = 0; i < MALLOC_DELAYED_CHUNK_MASK + 1; i++)
+	for (i = 0; i < MALLOC_DELAYED_CHUNK_MASK + 1; i++) {
 		validate_junk(pool->delayed_chunks[i]);
+		validate_junk(pool->delayed_chunks_queue[i]);
+	}
 	_MALLOC_UNLOCK();
 }
 
@@ -1431,6 +1435,7 @@ ofree(void *p)
 		if (!mopts.malloc_freenow) {
 			if (find_chunknum(pool, r, p) == (uint32_t)-1)
 				return;
+
 			i = getrbyte(pool) & MALLOC_DELAYED_CHUNK_MASK;
 			tmp = p;
 			p = pool->delayed_chunks[i];
@@ -1438,9 +1443,23 @@ ofree(void *p)
 				wrterror("double free", p);
 				return;
 			}
+			pool->delayed_chunks[i] = tmp;
+
+			if (p == NULL)
+				return;
+
+			tmp = p;
+			p = pool->delayed_chunks_queue[pool->queue_index];
+			if (tmp == p) {
+				wrterror("double free", p);
+				return;
+			}
+			pool->delayed_chunks_queue[pool->queue_index] = tmp;
+			pool->queue_index++;
+			pool->queue_index &= MALLOC_DELAYED_CHUNK_MASK;
+
 			if (mopts.malloc_junk)
 				validate_junk(p);
-			pool->delayed_chunks[i] = tmp;
 		}
 		if (p != NULL) {
 			r = find(pool, p);
