@@ -162,6 +162,7 @@ struct dir_info {
 	size_t queue_index;
 	void *delayed_chunks[MALLOC_DELAYED_CHUNK_MASK + 1];
 	void *delayed_chunks_queue[MALLOC_DELAYED_CHUNK_MASK + 1];
+	void *delayed_chunks_set[(MALLOC_DELAYED_CHUNK_MASK + 1) * 4];
 	size_t rbytesused;		/* random bytes used */
 	u_char rbytes[32];		/* random bytes */
 	u_short chunk_start;
@@ -272,6 +273,22 @@ hash(void *p)
 	uintptr_t u;
 
 	u = (uintptr_t)p >> MALLOC_PAGESHIFT;
+	sum = u;
+	sum = (sum << 7) - sum + (u >> 16);
+#ifdef __LP64__
+	sum = (sum << 7) - sum + (u >> 32);
+	sum = (sum << 7) - sum + (u >> 48);
+#endif
+	return sum;
+}
+
+static inline size_t
+hash_chunk(void *p)
+{
+	size_t sum;
+	uintptr_t u;
+
+	u = (uintptr_t)p >> MALLOC_MINSHIFT;
 	sum = u;
 	sum = (sum << 7) - sum + (u >> 16);
 #ifdef __LP64__
@@ -967,6 +984,64 @@ delete(struct dir_info *d, struct region_info *ri)
 	}
 }
 
+void **delayed_chunks_find(struct dir_info *d, void *p) {
+	size_t index;
+	size_t mask = sizeof(d->delayed_chunks_set) / sizeof(void *) - 1;
+	void *q;
+
+	index = hash_chunk(p) & mask;
+	q = d->delayed_chunks_set[index];
+	while (q != p && q != NULL) {
+		index = (index - 1) & mask;
+		q = d->delayed_chunks_set[index];
+	}
+	return q == p ? &d->delayed_chunks_set[index] : NULL;
+}
+
+void delayed_chunks_insert(struct dir_info *d, void *p) {
+	size_t index;
+	size_t mask = sizeof(d->delayed_chunks_set) / sizeof(void *) - 1;
+	void *q;
+
+	index = hash_chunk(p) & mask;
+	q = d->delayed_chunks_set[index];
+	while (q != NULL) {
+		index = (index - 1) & mask;
+		q = d->delayed_chunks_set[index];
+	}
+	d->delayed_chunks_set[index] = p;
+}
+
+void delayed_chunks_delete(struct dir_info *d, void *p) {
+	size_t mask = sizeof(d->delayed_chunks_set) / sizeof(void *) - 1;
+	size_t i, j, r;
+	void **slot;
+
+	slot = delayed_chunks_find(d, p);
+	if (slot == NULL) {
+		wrterror("missing from quarantine tracking table", p);
+		return;
+	}
+
+	i = slot - d->delayed_chunks_set;
+	for (;;) {
+		d->delayed_chunks_set[i] = NULL;
+		j = i;
+		for (;;) {
+			i = (i - 1) & mask;
+			if (d->delayed_chunks_set[i] == NULL)
+				return;
+			r = hash_chunk(d->delayed_chunks_set[i]) & mask;
+			if ((i <= r && r < j) || (r < j && j < i) ||
+			    (j < i && i <= r))
+				continue;
+			d->delayed_chunks_set[j] = d->delayed_chunks_set[i];
+			break;
+		}
+	}
+}
+
+
 /*
  * Allocate a page of chunks
  */
@@ -1436,13 +1511,19 @@ ofree(void *p)
 			if (find_chunknum(pool, r, p) == (uint32_t)-1)
 				return;
 
-			i = getrbyte(pool) & MALLOC_DELAYED_CHUNK_MASK;
-			tmp = p;
-			p = pool->delayed_chunks[i];
-			if (tmp == p) {
+			if (p == NULL)
+				return;
+
+			if (delayed_chunks_find(pool, p) != NULL) {
 				wrterror("double free", p);
 				return;
 			}
+
+			delayed_chunks_insert(pool, p);
+
+			i = getrbyte(pool) & MALLOC_DELAYED_CHUNK_MASK;
+			tmp = p;
+			p = pool->delayed_chunks[i];
 			pool->delayed_chunks[i] = tmp;
 
 			if (p == NULL)
@@ -1450,13 +1531,14 @@ ofree(void *p)
 
 			tmp = p;
 			p = pool->delayed_chunks_queue[pool->queue_index];
-			if (tmp == p) {
-				wrterror("double free", p);
-				return;
-			}
 			pool->delayed_chunks_queue[pool->queue_index] = tmp;
 			pool->queue_index++;
 			pool->queue_index &= MALLOC_DELAYED_CHUNK_MASK;
+
+			if (p == NULL)
+				return;
+
+			delayed_chunks_delete(pool, p);
 
 			if (mopts.malloc_junk)
 				validate_junk(p);
@@ -2210,6 +2292,7 @@ malloc_dump(int fd)
 			wrterror("bogus pointer in malloc_dump", p);
 			continue;
 		}
+		delayed_chunks_delete(pool, p);
 		free_bytes(pool, r, p);
 		pool->delayed_chunks[i] = NULL;
 	}
