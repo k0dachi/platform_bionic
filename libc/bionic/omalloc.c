@@ -697,7 +697,6 @@ omalloc_init(struct dir_info **dp)
 				mopts.malloc_junk_init = 1;
 				mopts.malloc_validate_full = 1;
 				mopts.malloc_guard = MALLOC_PAGESIZE;
-				mopts.malloc_cache = 0;
 				break;
 			case 'u':
 				mopts.malloc_freeunmap = 0;
