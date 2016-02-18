@@ -691,6 +691,7 @@ omalloc_init(struct dir_info **dp)
 				mopts.malloc_cache = MALLOC_DEFAULT_CACHE;
 				break;
 			case 'S':
+				mopts.malloc_canaries = sizeof(void *);
 				mopts.malloc_freeunmap = 1;
 				mopts.malloc_junk = 2;
 				mopts.malloc_junk_init = 1;
