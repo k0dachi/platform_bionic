@@ -2010,10 +2010,26 @@ omalloc_object_size(const void *p)
 	if (sz == 0)
 		return sz;
 
-	if (sz <= MALLOC_MAXCHUNK)
-		return sz - mopts.malloc_canaries;
+	if (sz <= MALLOC_MAXCHUNK) {
+		uintptr_t base = (uintptr_t)p & ~(sz - 1);
+		size_t offset = (uintptr_t)p - base;
+		return sz - mopts.malloc_canaries - offset;
+	}
 
-	return sz - mopts.malloc_guard;
+	uintptr_t base = (uintptr_t)p & ~MALLOC_PAGEMASK;
+	if (mopts.malloc_move &&
+	    sz - mopts.malloc_guard < MALLOC_PAGESIZE -
+	    MALLOC_LEEWAY) {
+		base = base + ((MALLOC_PAGESIZE - MALLOC_LEEWAY -
+		    (sz - mopts.malloc_guard)) & ~(MALLOC_MINSIZE-1));
+	}
+
+	size_t offset = (uintptr_t)p - base;
+
+	if (offset > sz - mopts.malloc_guard)
+		return 0; /* abort? */
+
+	return sz - mopts.malloc_guard - offset;
 }
 
 size_t
