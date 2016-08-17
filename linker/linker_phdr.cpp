@@ -358,7 +358,7 @@ bool ElfReader::ReserveAddressSpace(const android_dlextinfo* extinfo) {
     if (strict_hint && (start != mmap_hint)) {
       munmap(start, load_size_);
       DL_ERR("couldn't reserve %zd bytes of address space at %p for \"%s\"",
-             load_size_, mmap_hint, name_.c_str());
+             load_size_, mmap_hint, name_);
       return false;
     }
   } else {
